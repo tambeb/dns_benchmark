@@ -1,2 +1,2 @@
 # dns_benchmark
-Simple DNS benchmark tool
+Very crude DNS benchmark tool
