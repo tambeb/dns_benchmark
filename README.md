@@ -8,6 +8,11 @@ git clone https://github.com/tambeb/dns_benchmark.git
 cd dns_benchmark
 npm install
 ```
+On the Linux/WSL side you need to be able to run getdns_query and dig.
+```
+sudo apt-get update
+sudo apt-get install getdns-utils dnsutils
+```
 ## Use
 To run all four types of DNS requests on all the targets in the settings file:
 ```
