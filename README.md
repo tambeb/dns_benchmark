@@ -3,6 +3,13 @@ Very crude DNS benchmark tool
 
 ## Setup
 You should preferably do this in Linux or WSL in Windows. See setup info for WSL [here](https://docs.microsoft.com/en-us/windows/wsl/install-win10).
+
+First, install Node if you don't already have it:
+```
+curl -sL https://deb.nodesource.com/setup_15.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+Then:
 ```
 git clone https://github.com/tambeb/dns_benchmark.git
 cd dns_benchmark
