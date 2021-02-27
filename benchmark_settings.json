@@ -105,7 +105,7 @@
             "path": "dns-query"
         }
     ],
-    "outputFileTemplate": "${ protocol }_${ domain }_${ timestamp }.csv",
+    "outputFileTemplate": "dns_benchmark_output_${ timestamp }",
     "commands": {
         "dot": "getdns_query -t 10000 -s -a -l L -j ${ url } @${ server }~${ hostname } A",
         "dns": "dig ${ url } @${ server }",
