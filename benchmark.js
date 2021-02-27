@@ -99,8 +99,16 @@ var product = ( arr ) => {
 };
 function dohRequest( data ) {
     let start = Date.now();
-    let res = syncRequest( 'GET', data.url );
-    res = JSON.parse( res.getBody( 'utf8' ) );
+    let res = syncRequest( 'POST', data.url,
+        {
+            headers: {
+                'Content-Type': 'application/dns-message',
+                'Content-Length': Buffer.byteLength( data.dns )
+            },
+            body: data.dns
+        }
+    );
+    res = dnsPacket.decode( res.body );
     let timing = Date.now() - start;
     if ( parseDohResponse( res ) ) {
         return { timing: timing };
@@ -139,8 +147,9 @@ function generateCmd( data, template ) {
     return cmd;
 }
 function parseDohResponse( data ) {
+    let value = data.rcode || data.Status;
     try {
-        if ( data.rcode == 'NOERROR' || data.rcode == 'NXDOMAIN' ) {
+        if ( value == 'NOERROR' || value == 'NXDOMAIN' || value == 0 | value == 3 ) {
             return true;
         }
         else {
@@ -296,13 +305,22 @@ let summary = ( args.protocol.reduce( ( summaryProtocol, protocol ) => {
             summaryProtocol.push( args.category.reduce( ( summaryDomain, category ) => {
                 summaryDomain.push( args.targetData.reduce( ( summaryTarget, target ) => {
                     let id = target.id;
-                    let doh = false || target.doh;
-                    let server = doh ? doh : target.server;
-                    let path = target.path;
-                    let hostname = `${ target.hostname ? target.hostname + '.' : target.hostname }${ server }`;
+                    let server = target.doh.reduce( ( acc, item ) => {
+                        acc += item == 'hostname' ? `${ target[ item ] }.` : ( item == 'path' ? `/${ target[ item ] }` : target[ item ] );
+                        return acc;
+                    }, '' );
                     let counter = runCounter( args.domainList[ category ].length );
                     summaryTarget.push( args.domainList[ category ].reduce( ( summarySite, site ) => {
-                        let cmdResult = dohRequest( { url: `https://${ hostname }/${ path }?name=${ site }` } );
+                        let dns = dnsPacket.encode( {
+                            type: 'query',
+                            id: getRandomInt(),
+                            flags: dnsPacket.RECURSION_DESIRED,
+                            questions: [ {
+                                type: 'A',
+                                name: site
+                            } ]
+                        } );
+                        let cmdResult = dohRequest( { url: `https://${ server }`, dns: dns } );
                         let result = `${ id },${ protocol },${ category },${ site },${ cmdResult.timing }`;
                         appendNewLine( result, `${ outputFileName }.csv`, [ root ] );
                         console.log( `${ counterOverall.count() } ${ counter.count() }: ${ result }` );
