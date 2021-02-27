@@ -4,32 +4,52 @@
             "id": "blockerDNS1",
             "server": "35.237.220.84",
             "hostname": "YOURUNIQUEUSERNAME",
-            "doh": "blockerdns.com",
+            "domain": "blockerdns.com",
             "path": "dns-query",
+            "doh": [
+                "hostname",
+                "domain",
+                "path"
+            ],
             "dot": ""
         },
         {
             "id": "blockerDNS2",
             "server": "35.230.160.38",
             "hostname": "YOURUNIQUEUSERNAME",
-            "doh": "blockerdns.com",
+            "domain": "blockerdns.com",
             "path": "dns-query",
+            "doh": [
+                "hostname",
+                "domain",
+                "path"
+            ],
             "dot": ""
         },
         {
             "id": "blockerDNS3",
             "server": "35.245.234.132",
             "hostname": "YOURUNIQUEUSERNAME",
-            "doh": "blockerdns.com",
+            "domain": "blockerdns.com",
             "path": "dns-query",
+            "doh": [
+                "hostname",
+                "domain",
+                "path"
+            ],
             "dot": ""
         },
         {
             "id": "blockerDNS4",
             "server": "35.231.247.227",
             "hostname": "YOURUNIQUEUSERNAME",
-            "doh": "blockerdns.com",
+            "domain": "blockerdns.com",
             "path": "dns-query",
+            "doh": [
+                "hostname",
+                "domain",
+                "path"
+            ],
             "dot": ""
         },
         {
@@ -37,23 +57,35 @@
             "server": "185.228.168.83",
             "hostname": "YOURUNIQUEID",
             "path": "doh/custom-filter/YOURUNIQUEPATH",
+            "doh": [
+                "domain",
+                "path"
+            ],
             "dot": "",
-            "doh": "doh.cleanbrowsing.org"
+            "domain": "doh.cleanbrowsing.org"
         },
         {
             "id": "CleanBrowsing2",
             "server": "185.228.169.83",
             "hostname": "YOURUNIQUEID",
             "path": "doh/custom-filter/YOURUNIQUEPATH",
+            "doh": [
+                "domain",
+                "path"
+            ],
             "dot": "",
-            "doh": "doh.cleanbrowsing.org"
+            "domain": "doh.cleanbrowsing.org"
         },
         {
             "id": "NextDNS1",
             "server": "45.90.28.73",
             "hostname": "YOURUNIQUEID",
             "path": "YOURUNIQUEID",
-            "doh": "dns.nextdns.io",
+            "domain": "dns.nextdns.io",
+            "doh": [
+                "domain",
+                "path"
+            ],
             "dot": ""
         },
         {
@@ -61,48 +93,80 @@
             "server": "45.90.30.73",
             "hostname": "YOURUNIQUEID",
             "path": "YOURUNIQUEID",
-            "doh": "dns.nextdns.io",
+            "domain": "dns.nextdns.io",
+            "doh": [
+                "domain",
+                "path"
+            ],
             "dot": ""
         },
         {
             "id": "AdGuard1",
             "server": "176.103.130.130",
             "hostname": "dns",
-            "doh": "adguard.com"
+            "domain": "adguard.com",
+            "path": "dns-query",
+            "doh": [
+                "hostname",
+                "domain",
+                "path"
+            ]
         },
         {
             "id": "AdGuard2",
             "server": "176.103.130.131",
             "hostname": "dns",
-            "doh": "adguard.com"
+            "domain": "adguard.com",
+            "path": "dns-query",
+            "doh": [
+                "hostname",
+                "domain",
+                "path"
+            ]
         },
         {
             "id": "Google1",
             "server": "8.8.8.8",
-            "doh": "dns.google",
+            "domain": "dns.google",
             "hostname": "dns",
-            "path": "dns-query"
+            "path": "dns-query",
+            "doh": [
+                "domain",
+                "path"
+            ]
         },
         {
             "id": "Google2",
             "server": "8.8.4.4",
-            "doh": "dns.google",
+            "domain": "dns.google",
             "hostname": "dns",
-            "path": "dns-query"
+            "path": "dns-query",
+            "doh": [
+                "domain",
+                "path"
+            ]
         },
         {
             "id": "Cloudflare1",
             "server": "1.1.1.1",
             "hostname": "cloudflare-dns",
-            "doh": "cloudflare-dns.com",
-            "path": "dns-query"
+            "domain": "cloudflare-dns.com",
+            "path": "dns-query",
+            "doh": [
+                "domain",
+                "path"
+            ]
         },
         {
             "id": "Cloudflare2",
             "server": "1.0.0.1",
             "hostname": "cloudflare-dns",
-            "doh": "cloudflare-dns.com",
-            "path": "dns-query"
+            "domain": "cloudflare-dns.com",
+            "path": "dns-query",
+            "doh": [
+                "domain",
+                "path"
+            ]
         }
     ],
     "outputFileTemplate": "dns_benchmark_output_${ timestamp }",
