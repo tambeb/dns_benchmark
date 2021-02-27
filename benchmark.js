@@ -5,19 +5,25 @@ const fs = require( 'fs-extra' );
 const root = path.resolve();
 const https = require( 'https' );
 const dnsPacket = require( 'dns-packet' );
+const { execSync } = require( 'child_process' );
+const syncRequest = require( 'sync-request' );
 
 var settings = openJsonSync( 'benchmark_settings.json' );
 const protocols = Object.keys( settings.commands );
-const domains = settings.domains;
+const categories = settings.domains;
 const targets = settings.targets.reduce( ( acc, item ) => {
     acc.push( item.id );
     return acc;
 }, [] );
 var outputFileTemplate = settings.outputFileTemplate;
 
+process.on( 'warning', ( warning ) => { console.log( warning ); } );
+process.on( 'unhandledRejection', ( reason, promise ) => { console.log( reason ); console.log( promise ); } );
+process.on( 'uncaughtException', ( err ) => { console.log( err ); } );
+
 let args = {
     protocol: null,
-    domain: null,
+    category: null,
     target: null,
     targetData: [],
     domainList: {}
@@ -29,13 +35,13 @@ process.argv.slice( 2 ).map( item => {
         args[ temp[ 0 ].toLowerCase() ] = temp[ 1 ].toLowerCase().split( ',' );
     }
     else if ( item.includes( '?' ) || item.toLowerCase().includes( 'help' ) ) {
-        console.log( `Usage: node benchmark protocol=PROTOCOL[,PROTOCOL] domain=DOMAINS[,DOMAINS] target=TARGET[,TARGET]` );
+        console.log( `Usage: node benchmark protocol=PROTOCOL[,PROTOCOL] category=CATEGORY[,CATEGORY] target=TARGET[,TARGET]` );
         console.group( 'protocol' );
         console.log( `Comma separated list of one or more of: ${ protocols }` );
         console.groupEnd();
 
-        console.group( 'domains' );
-        console.log( `Comma separated list of one or more of: ${ Object.keys( domains ) }` );
+        console.group( 'category' );
+        console.log( `Comma separated list of one or more of: ${ Object.keys( categories ) }` );
         console.groupEnd();
 
         console.group( 'target' );
@@ -53,112 +59,74 @@ args.targetData = settings.targets.filter( item => {
     return args.target.includes( item.id.toLowerCase() );
 } );
 
-args.domain.map( item => {
+args.category.map( item => {
     args.domainList[ item ] = settings.domains[ item ];
 } );
 
-const { execSync } = require( 'child_process' );
-
-function dohRequest( hostname, path, dns, counter ) {
-    return new Promise( function ( resolve, reject ) {
-        let options = {
-            hostname: hostname,
-            port: 443,
-            path: '/' + path,
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/dns-message',
-                'Content-Length': Buffer.byteLength( dns )
-            }
-        };
-
-        const req = https.request( options, ( res ) => {
-            res.setEncoding( 'utf8' );
-            res.on( 'data', ( chunk ) => {
+var average = ( arr ) => {
+    if ( Array.isArray( arr ) ) {
+        if ( arr.length > 0 ) {
+            let count = 1;
+            let total = arr.reduce( ( a, b ) => {
+                count++;
+                return a + b;
             } );
-            res.on( 'end', () => {
-                let timing = Date.now() - start;
-                let count = counter.count();
-                resolve( { timing: timing, count: count } );
-            } );
-        } );
-
-        req.on( 'error', ( e ) => {
-            // console.log( e );
-            reject( e );
-        } );
-
-        let start = Date.now();
-        req.write( dns );
-        req.end();
-    } );
-}
-async function doh( data ) {
-    for ( let i in data.target ) {
-        let id = data.target[ i ].id;
-        let doh = false || data.target[ i ].doh;
-        let server = doh ? doh : data.target[ i ].server;
-        let hostname = data.target[ i ].path == data.target[ i ].hostname ? "" : data.target[ i ].hostname;
-        let path = data.target[ i ].path;
-
-        let counter = runCounter( args.domainList[ data.domain ].length );
-
-        for ( let site of args.domainList[ data.domain ] ) {
-            let dns = dnsPacket.encode( {
-                type: 'query',
-                id: getRandomInt(),
-                flags: dnsPacket.RECURSION_DESIRED,
-                questions: [ {
-                    type: 'A',
-                    name: site
-                } ]
-            } );
-            let cmdResult;
-            try {
-                cmdResult = await dohRequest( `${ hostname ? hostname + '.' : hostname }${ server }`, path, dns, counter );
-            }
-            catch ( err ) {
-                console.log( 'not using hostname' );
-                hostname = "";
-                cmdResult = await dohRequest( `${ hostname ? hostname + '.' : hostname }${ server }`, path, dns, counter );
-            }
-
-            if ( cmdResult.timing ) {
-                let result = `${ id },${ site },${ cmdResult.timing }`;
-                appendNewLine( result, data.outputFileName, [ root ] );
-                console.log( cmdResult.count + ' ' + result );
-            }
-            else {
-                let result = `${ id },${ site }`;
-                appendNewLine( result, data.outputFileName, [ root ] );
-                console.log( cmdResult.count + ' ' + result );
-            }
+            return total / count;
         }
-        console.log( '***' );
+        else {
+            return 0;
+        }
+    }
+    else {
+        return 0;
+    }
+};
+var product = ( arr ) => {
+    if ( Array.isArray( arr ) ) {
+        if ( arr.length > 0 ) {
+            let prod = arr.reduce( ( a, b ) => {
+                return a * b;
+            } );
+            return prod;
+        }
+        else {
+            return 0;
+        }
+    }
+    else {
+        return 0;
+    }
+};
+function dohRequest( data ) {
+    let start = Date.now();
+    let res = syncRequest( 'GET', data.url );
+    res = JSON.parse( res.getBody( 'utf8' ) );
+    let timing = Date.now() - start;
+    if ( parseDohResponse( res ) ) {
+        return { timing: timing };
+    }
+    else {
+        return { timing: false };
     }
 }
-function execCmdSync( cmd, counter, type ) {
+function execCmdSync( cmd, type ) {
     let start = Date.now();
     let final = execSync( cmd, { encoding: 'utf8' } );
     let timing = Date.now() - start;
-    let count = counter.count();
-    let result;
     if ( type == 'dot' ) {
-        result = parsegetDnsQueryResponse( final );
-        if ( result ) {
-            return { timing: timing, count: count };
+        if ( parsegetDnsQueryResponse( final ) ) {
+            return { timing: timing };
         }
         else {
-            return { timing: false, count: count };
+            return { timing: false };
         }
     }
     else if ( type.includes( 'dns' ) ) {
-        let result = parseDigResponse( final );
-        if ( result ) {
-            return { timing: timing, count: count };
+        if ( parseDigResponse( final ) ) {
+            return { timing: timing };
         }
         else {
-            return { timing: false, count: count };
+            return { timing: false };
         }
     }
 }
@@ -169,6 +137,19 @@ function generateCmd( data, template ) {
     let cmd;
     cmd = eval( '`' + template + '`' );
     return cmd;
+}
+function parseDohResponse( data ) {
+    try {
+        if ( data.rcode == 'NOERROR' || data.rcode == 'NXDOMAIN' ) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    catch ( err ) {
+        return false;
+    }
 }
 function parsegetDnsQueryResponse( data ) {
     let status;
@@ -201,7 +182,7 @@ function openJsonSync( fileName ) {
     fs.ensureFileSync( file );
     return fs.readJsonSync( file );
 }
-function saveFile( fileName, data, filePath = root ) {
+function saveFile( fileName, data, filePath = [ root ] ) {
     return new Promise( function ( resolve, reject ) {
         let file = path.join( ...filePath, fileName );
         fs.writeFile( file, data ).then( () => {
@@ -211,7 +192,7 @@ function saveFile( fileName, data, filePath = root ) {
         } );
     } );
 }
-function openFile( fileName, filePath = root ) {
+function openFile( fileName, filePath = [ root ] ) {
     return new Promise( function ( resolve, reject ) {
         let file = path.join( ...filePath, fileName );
         fs.readFile( file, 'utf8' ).then( data => {
@@ -291,7 +272,7 @@ var runCounter = function ( total ) {
     return {
         count: function () {
             increment();
-            return `${ current }/${ total }:`;
+            return `${ current }/${ total }`;
         }
     };
 };
@@ -299,45 +280,111 @@ var getRandomInt = function () {
     return Math.floor( Math.random() * ( 65534 - 1 + 1 ) ) + 1;
 };
 
-args.protocol.forEach( protocol => {
-    protocol = protocol.toLowerCase();
-    if ( protocol != 'doh' ) {
-        args.domain.forEach( domain => {
-            let timestamp = getYYYYMMDDHHMMSSTime();
-            args.targetData.forEach( target => {
-                let command = settings.commands[ protocol ];
-                let id = target.id;
-                let dot = false || target.dot;
-                let server = dot ? dot : target.server;
-                let hostname = dot ? "" : target.hostname;
-                let outputFileName = eval( '`' + outputFileTemplate + '`' );
-                let counter = runCounter( args.domainList[ domain ].length );
-                args.domainList[ domain ].forEach( ( site ) => {
-                    let cmdResult = execCmdSync( generateCmd( { url: site, server: server, hostname: hostname }, command ), counter, protocol );
-                    if ( cmdResult.timing ) {
-                        let result = `${ id },${ site },${ cmdResult.timing }`;
-                        appendNewLine( result, outputFileName, [ root ] );
-                        console.log( cmdResult.count + ' ' + result );
-                    }
-                    else {
-                        let result = `${ id },${ site }`;
-                        appendNewLine( result, outputFileName, [ root ] );
-                        console.log( cmdResult.count + ' ' + result );
-                    }
-                } );
-                console.log( '***' );
-            } );
-        } );
+let factors = [];
+factors.push( args.category.reduce( ( sum, item ) => {
+    sum += args.domainList[ item ].length;
+    return sum;
+}, 0 ) );
+factors.push( args.target.length );
+factors.push( args.protocol.length );
+let counterOverall = runCounter( product( factors ) );
+let timestamp = getYYYYMMDDHHMMSSTime();
+let outputFileName = eval( '`' + outputFileTemplate + '`' );
+let summary = ( args.protocol.reduce( ( summaryProtocol, protocol ) => {
+    switch ( protocol ) {
+        case 'doh':
+            summaryProtocol.push( args.category.reduce( ( summaryDomain, category ) => {
+                summaryDomain.push( args.targetData.reduce( ( summaryTarget, target ) => {
+                    let id = target.id;
+                    let doh = false || target.doh;
+                    let server = doh ? doh : target.server;
+                    let path = target.path;
+                    let hostname = `${ target.hostname ? target.hostname + '.' : target.hostname }${ server }`;
+                    let counter = runCounter( args.domainList[ category ].length );
+                    summaryTarget.push( args.domainList[ category ].reduce( ( summarySite, site ) => {
+                        let cmdResult = dohRequest( { url: `https://${ hostname }/${ path }?name=${ site }` } );
+                        let result = `${ id },${ protocol },${ category },${ site },${ cmdResult.timing }`;
+                        appendNewLine( result, `${ outputFileName }.csv`, [ root ] );
+                        console.log( `${ counterOverall.count() } ${ counter.count() }: ${ result }` );
+                        summarySite.push( {
+                            protocol: protocol,
+                            id: id,
+                            category: category,
+                            domain: site,
+                            time: cmdResult.timing
+                        } );
+                        return summarySite;
+                    }, [] ) );
+                    return summaryTarget;
+                }, [] ) );
+                return summaryDomain;
+            }, [] ) );
+            return summaryProtocol;
+            break;
+        case 'dns':
+        case 'dnstcp':
+        case 'dot':
+            summaryProtocol.push( args.category.reduce( ( summaryDomain, category ) => {
+                summaryDomain.push( args.targetData.reduce( ( summaryTarget, target ) => {
+                    let command = settings.commands[ protocol ];
+                    let id = target.id;
+                    let dot = false || target.dot;
+                    let server = dot ? dot : target.server;
+                    let hostname = dot ? "" : target.hostname;
+                    let counter = runCounter( args.domainList[ category ].length );
+                    summaryTarget.push( args.domainList[ category ].reduce( ( summarySite, site ) => {
+                        let cmdResult = execCmdSync( generateCmd( { url: site, server: server, hostname: hostname }, command ), protocol );
+                        let result = `${ id },${ protocol },${ category },${ site },${ cmdResult.timing }`;
+                        appendNewLine( result, `${ outputFileName }.csv`, [ root ] );
+                        console.log( `${ counterOverall.count() } ${ counter.count() }: ${ result }` );
+                        summarySite.push( {
+                            protocol: protocol,
+                            id: id,
+                            category: category,
+                            domain: site,
+                            time: cmdResult.timing
+                        } );
+                        return summarySite;
+                    }, [] ) );
+                    return summaryTarget;
+                }, [] ) );
+                return summaryDomain;
+            }, [] ) );
+            return summaryProtocol;
+            break;
+        default:
+            console.log( `Unknown protocol: ${ protocol }` );
+            return summaryProtocol;
     }
-    else {
-        args.domain.forEach( domain => {
-            let timestamp = getYYYYMMDDHHMMSSTime();
-            let outputFileName = eval( '`' + outputFileTemplate + '`' );
-            doh( { outputFileName: outputFileName, target: args.targetData, domain: domain } );
-        } );
-    }
-} );
+}, [] ) ).flat( Infinity );
 
-process.on( 'warning', ( warning ) => { console.log( warning ); } );
-process.on( 'unhandledRejection', ( reason, promise ) => { console.log( reason ); console.log( promise ); } );
-process.on( 'uncaughtException', ( err ) => { console.log( err ); } );
+saveFile( `${ outputFileName }.json`, JSON.stringify( summary ) );
+
+console.log( '\n' );
+console.log( `average query response times( lower is better )` );
+
+args.protocol.map( protocol => {
+    console.log( `protocol: ${ protocol }` );
+    let timesCategory = {};
+    timesCategory[ 'overall' ] = {};
+    args.target.map( target => {
+        let times = summary.reduce( ( times, current ) => {
+            current.id.toLowerCase() == target.toLowerCase() && ( current.protocol == protocol ) ? times.push( current.time ) : true;
+            return times;
+        }, [] );
+        timesCategory[ 'overall' ][ target ] = average( times );
+    } );
+
+    args.category.map( category => {
+        timesCategory[ `${ category } domains` ] = {};
+        args.target.map( target => {
+            let times = summary.reduce( ( times, current ) => {
+                ( current.id.toLowerCase() == target.toLowerCase() ) && ( current.category == category ) && ( current.protocol == protocol ) ? times.push( current.time ) : true;
+                return times;
+            }, [] );
+            timesCategory[ `${ category } domains` ][ target ] = average( times );
+        } );
+    } );
+
+    console.table( timesCategory );
+} );;
