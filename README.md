@@ -23,6 +23,8 @@ sudo apt-get install getdns-utils dnsutils
 ## Use
 To run all four types of DNS requests on all the targets in the settings file:
 ```
-node benchmark protocol=dns,dnstcp,doh,dot domain=ad,top target=blockerdns1,blockerdns2,blockerdns3,blockerdns4,nextdns1,nextdns2,cleanbrowsing1,cleanbrowsing2,adguard1,adguard2
+node benchmark protocol=dns,dnstcp,doh,dot category=ad,top target=blockerdns1,blockerdns2,blockerdns3,blockerdns4,nextdns1,nextdns2,cleanbrowsing1,cleanbrowsing2,adguard1,adguard2
 ```
 Note: For blockerDNS, NextDNS and CleanBrowsing you need to be registered and have a user ID which then gets put into the settings file.
+
+Average query response times will be shown in the console, and individual query response times will be saved to CSV and JSON files.
